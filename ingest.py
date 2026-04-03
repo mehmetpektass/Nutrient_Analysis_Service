@@ -7,8 +7,8 @@ import zipfile
 
 DB_PATH = 'food.db'
 
-FOUNDATION_FOOD = "FoodData_Central_foundation_food_json_2025-12-18 22.48.42.zip"
-SR_LEGACY_FOOD = "FoodData_Central_sr_legacy_food_json_2018-04.zip"
+FOUNDATION_ZIP = "FoodData_Central_foundation_food_json_2025-12-18 22.48.42.zip"
+SR_LEGACY_ZIP = "FoodData_Central_sr_legacy_food_json_2018-04.zip"
 
 NUTRIENT_IDS = {
     
@@ -147,3 +147,32 @@ def build_db(foods: list[dict]):
     con.close()
 
     print(f"Done. {len(foods)} foods written to {DB_PATH}.")
+    
+def main():
+    all_foods = []
+    
+    for zip_path in [FOUNDATION_ZIP, SR_LEGACY_ZIP]:
+        if not os.path.exist(zip_path):
+            print(f"WARNING: {zip_path} not found, skipping.")
+            continue
+        
+        data = extract_json(zip_path)
+        foods = parse_food(data)
+        print(f"  → {len(foods)} foods parsed from {zip_path}")
+        all_foods.extend(foods)
+
+    if not all_foods:
+        print("ERROR: No food data found. Download the USDA zip files first.")
+        sys.exit(1)
+        
+    seen = set()
+    unique_foods = []
+    for f in all_foods:
+        if f["fdc_id"] not in seen:
+            seen.add(f["fdc_id"])
+            unique_foods.append(f)
+
+    build_db(unique_foods)
+
+if __name__ == "__main__":
+    main()
