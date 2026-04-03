@@ -77,13 +77,13 @@ def parse_foods(data: dict) -> list[dict]:
             elif nutrient_id == 1162:
                 nutrients["vitamin_c"] = amount
 
-        # kcal yoksa Atwater formülüyle hesapla
+        # Use Atwater formula if there is not kcal 
         if "kcal" not in nutrients:
             p = nutrients.get("protein", 0)
             f = nutrients.get("fat", 0)
             c = nutrients.get("carbs", 0)
             if p == 0 and f == 0 and c == 0:
-                continue  # Hiç makro yoksa atla
+                continue
             nutrients["kcal"] = round((p * 4) + (f * 9) + (c * 4), 1)
 
         foods.append({
