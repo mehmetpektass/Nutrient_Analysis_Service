@@ -98,3 +98,52 @@ def parse_food(data: dict) -> list[dict]:
         })
         
     return foods
+
+
+def build_db(foods: list[dict]):
+    if os.path.exists(DB_PATH):
+        os.remove(DB_PATH)
+        print(f"Existing {DB_PATH} removed")
+    
+    con = sqlite3.connect(DB_PATH)
+    cur = con.cursor()
+    
+    cur.executescript("""
+        CREATE TABLE foods (
+            fdc_id        INTEGER PRIMARY KEY,
+            name          TEXT NOT NULL,
+            kcal          REAL DEFAULT 0,
+            protein       REAL DEFAULT 0,
+            fat           REAL DEFAULT 0,
+            carbs         REAL DEFAULT 0,
+            fiber         REAL DEFAULT 0,
+            sugar         REAL DEFAULT 0,
+            saturated_fat REAL DEFAULT 0,
+            sodium        REAL DEFAULT 0,
+            calcium       REAL DEFAULT 0,
+            iron          REAL DEFAULT 0,
+            potassium     REAL DEFAULT 0,
+            vitamin_c     REAL DEFAULT 0
+        );
+
+        CREATE VIRTUAL TABLE foods_fts USING fts5(
+            name,
+            content='foods',
+            content_rowid='fdc_id'
+        );
+    """)
+    
+    cur.executemany(
+        """INSERT INTO foods VALUES (
+            :fdc_id, :name, :kcal, :protein, :fat, :carbs,
+            :fiber, :sugar, :saturated_fat, :sodium,
+            :calcium, :iron, :potassium, :vitamin_c
+        )""",
+        foods
+    )
+    
+    cur.execute("INSERT INTO foods_fts(foods_fts) VALUES('rebuild')")
+    con.commit()
+    con.close()
+
+    print(f"Done. {len(foods)} foods written to {DB_PATH}.")
