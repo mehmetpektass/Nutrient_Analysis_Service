@@ -7,7 +7,7 @@ import zipfile
 
 DB_PATH = 'food.db'
 
-FOUNDATION_ZIP = "FoodData_Central_foundation_food_json_2025-12-18 22.48.42.zip"
+FOUNDATION_ZIP = "FoodData_Central_foundation_food_json_2025-12-18.zip"
 SR_LEGACY_ZIP = "FoodData_Central_sr_legacy_food_json_2018-04.zip"
 
 NUTRIENT_IDS = {
@@ -38,20 +38,20 @@ def extract_json (zip_path: str) -> dict:
             return json.load(f)
 
 
-def parse_food(data: dict) -> list[dict]:
+def parse_foods(data: dict) -> list[dict]:
     foods = []
-    raw_data = data.get["FoundationFoods"] or data.get["SRLegacyFoods", []]
-    
-    for food in raw_data:
+    raw_foods = data.get("FoundationFoods") or data.get("SRLegacyFoods", [])
+
+    for food in raw_foods:
         name = food.get("description", "").strip().lower()
         if not name:
             continue
-        
+
         nutrients = {}
         for n in food.get("foodNutrients", []):
             nutrient_id = n.get("nutrient", {}).get("id")
             amount = round(n.get("amount", 0), 2)
-            
+
             if nutrient_id == 1008:
                 nutrients["kcal"] = amount
             elif nutrient_id == 1003:
@@ -62,7 +62,7 @@ def parse_food(data: dict) -> list[dict]:
                 nutrients["carbs"] = amount
             elif nutrient_id == 1079:
                 nutrients["fiber"] = amount
-            elif nutrient_id in (1063, 2000): #Both are sugar so ingest both
+            elif nutrient_id in (1063, 2000):
                 nutrients["sugar"] = amount
             elif nutrient_id == 1258:
                 nutrients["saturated_fat"] = amount
@@ -76,10 +76,16 @@ def parse_food(data: dict) -> list[dict]:
                 nutrients["potassium"] = amount
             elif nutrient_id == 1162:
                 nutrients["vitamin_c"] = amount
-        
+
+        # kcal yoksa Atwater formülüyle hesapla
         if "kcal" not in nutrients:
-            continue
-        
+            p = nutrients.get("protein", 0)
+            f = nutrients.get("fat", 0)
+            c = nutrients.get("carbs", 0)
+            if p == 0 and f == 0 and c == 0:
+                continue  # Hiç makro yoksa atla
+            nutrients["kcal"] = round((p * 4) + (f * 9) + (c * 4), 1)
+
         foods.append({
             "fdc_id":        food.get("fdcId"),
             "name":          name,
@@ -96,7 +102,7 @@ def parse_food(data: dict) -> list[dict]:
             "potassium":     nutrients.get("potassium", 0),
             "vitamin_c":     nutrients.get("vitamin_c", 0),
         })
-        
+
     return foods
 
 
@@ -152,12 +158,12 @@ def main():
     all_foods = []
     
     for zip_path in [FOUNDATION_ZIP, SR_LEGACY_ZIP]:
-        if not os.path.exist(zip_path):
+        if not os.path.exists(zip_path):
             print(f"WARNING: {zip_path} not found, skipping.")
             continue
         
         data = extract_json(zip_path)
-        foods = parse_food(data)
+        foods = parse_foods(data)
         print(f"  → {len(foods)} foods parsed from {zip_path}")
         all_foods.extend(foods)
 
