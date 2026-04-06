@@ -55,7 +55,7 @@ async def analyze_image(image_bytes: bytes, user_note: str = "") -> dict:
     response = await asyncio.get_event_loop().run_in_executor(
         None,
         lambda: client.models.generate_content(
-            model="gemini-2.0-flash",
+            model=GEMINI_MODEL,
             contents=[
                 types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
                 types.Part.from_text(text=prompt),
