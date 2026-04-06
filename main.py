@@ -22,7 +22,7 @@ async def analyze(
     note: str = Form(default="")
 ):
     
-    # Dosya tipi kontrolü
+    # File type check
     if image.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
@@ -31,7 +31,7 @@ async def analyze(
 
     image_bytes = await image.read()
     
-    # Dosya boyutu kontrolü
+    # File size check
     if len(image_bytes) > MAX_SIZE_MB * 1024 * 1024:
         raise HTTPException(
             status_code=400,
@@ -39,10 +39,10 @@ async def analyze(
         )
     
     try:
-        # 1. Vision Result — malzeme ve gram
+        # 1. Vision Result — ingredients and grams
         vision_result = await analyze_image(image_bytes, note)
         
-        # 2. Deterministik kalori hesaplama
+        # 2. Deterministic calorie calculation
         calc_result = calculate(vision_result["ingredients"])
         
         return {

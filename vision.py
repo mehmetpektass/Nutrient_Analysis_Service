@@ -1,6 +1,8 @@
 import json
 import os
-import google.generativeai as genai
+import asyncio
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -8,8 +10,8 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL")
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(GEMINI_MODEL)
+client = genai.Client(api_key=GEMINI_API_KEY)
+
 
 SYSTEM_PROMPT = """
 You are a nutrition analysis assistant. Analyze the food image carefully.
@@ -50,7 +52,16 @@ async def analyze_image(image_bytes: bytes, user_note: str = "") -> dict:
         "data": image_bytes
     }
     
-    response = model.generate_content([prompt, image_part])
+    response = await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                types.Part.from_text(text=prompt),
+            ]
+        )
+    )
     raw = response.text.strip()
     
     if raw.startswith("```"):
