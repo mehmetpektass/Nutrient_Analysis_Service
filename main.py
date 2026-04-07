@@ -40,7 +40,7 @@ async def analyze(
     
     try:
         # 1. Vision Result — ingredients and grams
-        vision_result = await analyze_image(image_bytes, note)
+        vision_result = await analyze_image(image_bytes, note, image.content_type or "image/jpeg")
         
         # 2. Deterministic calorie calculation
         calc_result = calculate(vision_result["ingredients"])

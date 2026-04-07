@@ -1,7 +1,6 @@
 import json
 import sqlite3
 import os
-import os
 import sys
 import zipfile
 
