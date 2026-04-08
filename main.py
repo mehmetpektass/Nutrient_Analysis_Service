@@ -1,6 +1,5 @@
 import os
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from vision import analyze_image
 from calculator import calculate
@@ -42,8 +41,8 @@ async def analyze(
         # 1. Vision Result — ingredients and grams
         vision_result = await analyze_image(image_bytes, note, image.content_type or "image/jpeg")
         
-        # 2. Deterministic calorie calculation
-        calc_result = calculate(vision_result["ingredients"])
+        # 2. AI Reranker & Deterministic Calculation
+        calc_result = await calculate(vision_result["ingredients"], user_note=note)
         
         return {
             "dish_name": vision_result["dish_name"],
