@@ -79,38 +79,24 @@ Respond ONLY with valid JSON matching this exact schema:
 """
 
 
-async def _generate_with_fallback(contents) -> str:
-    """
-    First tries PRIMARY_MODEL. If API fails due to overload (UNAVAILABLE etc.),
-    waits 2 seconds and retries with FALLBACK_MODEL.
-    """
+async def _generate_with_fallback(contents) -> tuple[str, str]:
+    """Returns response and USED MODEL NAME (as tuple)."""
     try:
         response = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: client.models.generate_content(
-                model=PRIMARY_MODEL,
-                contents=contents
-            )
+            None, lambda: client.models.generate_content(model=PRIMARY_MODEL, contents=contents)
         )
-        return response.text
+        return response.text, PRIMARY_MODEL
     except Exception as e:
-        print(f"\n[WARNING] Primary Model ({PRIMARY_MODEL}) failed: {e}")
-        print(f"[INFO] API may be busy. Waiting 2 seconds and switching to Fallback Model ({FALLBACK_MODEL})...\n")
-        
-        await asyncio.sleep(2) # Giving API time to breathe
-        
+        print(f"\n[WARNING] Primary Model ({PRIMARY_MODEL}) failed: {e}. Switching to Fallback Model...\n")
+        await asyncio.sleep(2)
         try:
             response = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: client.models.generate_content(
-                    model=FALLBACK_MODEL,
-                    contents=contents
-                )
+                None, lambda: client.models.generate_content(model=FALLBACK_MODEL, contents=contents)
             )
-            return response.text
+            return response.text, FALLBACK_MODEL
         except Exception as backup_error:
-            print(f"\n[CRITICAL ERROR] Fallback Model ({FALLBACK_MODEL}) also failed: {backup_error}")
-            raise backup_error # If both fail, raise the error (FastAPI will return 500)
+            raise backup_error
+        
 
 async def analyze_image(image_bytes: bytes, user_note: str = "", mime_type: str = "image/jpeg") -> dict:
     prompt = SYSTEM_PROMPT
@@ -122,8 +108,8 @@ async def analyze_image(image_bytes: bytes, user_note: str = "", mime_type: str 
         types.Part.from_text(text=prompt),
     ]
 
-    # Calling smart fallback helper instead of directly calling the function
-    raw = await _generate_with_fallback(contents)
+    # Returns two values: raw response and used model
+    raw, used_model = await _generate_with_fallback(contents)
     raw = raw.strip()
     
     if raw.startswith("```"):
@@ -131,7 +117,10 @@ async def analyze_image(image_bytes: bytes, user_note: str = "", mime_type: str 
         lines = [l for l in lines if not l.startswith("```")]
         raw = "\n".join(lines)
 
-    return json.loads(raw.strip())
+    result = json.loads(raw.strip())
+    result["model_used"] = used_model
+    return result
+
 
 async def rerank_candidates(ingredient_name: str, user_note: str, candidates: list[dict]) -> int | None:
     simplified_candidates = [{"fdc_id": c["fdc_id"], "name": c["name"]} for c in candidates]
@@ -142,8 +131,8 @@ async def rerank_candidates(ingredient_name: str, user_note: str, candidates: li
         candidates_json=json.dumps(simplified_candidates, indent=2)
     )
 
-    # Also calling smart fallback helper for rerank operation
-    raw = await _generate_with_fallback(prompt)
+    # Calling smart fallback helper for rerank operation
+    raw, _ = await _generate_with_fallback(prompt)
     raw = raw.strip()
     
     if raw.startswith("```"):
