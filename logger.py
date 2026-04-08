@@ -32,4 +32,4 @@ def log_request(endpoint: str, user_note: str, status: str, error_message: str =
         con.commit()
         con.close()
     except Exception as e:
-        print(f"[CRITICAL LOG ERROR] Log veritabani hatasi: {e}")
+        print(f"[CRITICAL LOG ERROR] Log Database Error: {e}")
