@@ -2,25 +2,17 @@ import os
 import time
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 # Custom module imports
 from vision import analyze_image
 from calculator import calculate
 from logger import init_log_db, log_request
+from cache import init_cache_db
 
 load_dotenv()
 
-app = FastAPI(title="Nutrient Analysis Service")
-
-# 1. CORS CONFIGURATION (Allows web/mobile application connections)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_SIZE_MB = 20
@@ -33,10 +25,24 @@ def verify_api_key(x_api_key: str = Header(...)):
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid API Key")
     return x_api_key
 
-# 3. INITIALIZE LOG DATABASE ON STARTUP
-@app.on_event("startup")
-def startup_event():
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_log_db()
+    init_cache_db()
+    yield
+    
+app = FastAPI(title="Nutrient Analysis Service", lifespan=lifespan)
+
+# 1. CORS CONFIGURATION (Allows web/mobile application connections)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/health")
 async def health():
