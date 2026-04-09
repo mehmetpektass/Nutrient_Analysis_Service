@@ -33,10 +33,13 @@ Rules:
 - CORRECT ANY TYPOS from the user note (e.g., "tramisu" -> "tiramisu" -> then decompose).
 - If the user notes a substitution, output the substituted raw ingredient.
 - If a dish is fried, include the cooking oil as a separate ingredient.
-- MANDATORY ADJECTIVES: NEVER use bare nouns for db_query if the state matters. ALWAYS include the preparation or cooking state (e.g., MUST output "roasted almonds" or "raw almonds" instead of just "almonds", "boiled potato" or "fried potato" instead of just "potato").
-- DATABASE AWARENESS: The `db_query` you generate will be directly searched in the USDA FoodData Central database. If an ingredient is highly specific, foreign, cultural, regional, or branded, it likely WILL NOT be found. You MUST translate it into the closest generic US-equivalent for the `db_query` field (e.g., translate a specific cultural cheese to "cream cheese", or "semi-sweet chocolate chips" to "dark chocolate"). Keep the original cultural name in the `name` field for the user to see, but use the generic US term for the `db_query`.
+- USDA DATABASE AWARENESS & MANDATORY SUBSTITUTION: The `db_query` you generate will be directly searched in the US-centric USDA database. Foreign, cultural, or branded ingredients (e.g., "Halloumi", "Sucuk") DO NOT EXIST. You MUST translate them into the closest generic US-equivalent (e.g., "Halloumi" -> "Fontina cheese"). If you fail to substitute, the system will crash.
+- SMART DATABASE QUERIES (CRITICAL): Generate a `db_query` that is most likely to find a direct match in the USDA FoodData Central.
+  1. ADJECTIVES: Use condition adjectives ONLY when the cooking state matters (e.g., "roasted almonds", "boiled potato"). Do NOT force "raw" or "boiled" onto basic liquids, dairy, sugars, or powders (e.g., use "whole milk", "salt", "flour", "honey").
+  2. PLURALS VS SINGULARS: Use plurals IF the item is naturally tiny and eaten in bulk (e.g., "blueberries", "oats", "strawberries", "pistachios"). Use singular for large distinct items (e.g., "apple", "egg", "chicken breast").
+  3. STRIP SHAPES: Remove physical cuts or shapes (e.g., "diced", "sliced", "chips", "chunks"). For example, "semi-sweet chocolate chips" MUST become "semisweet chocolate".
 
-Respond ONLY with valid JSON matching this exact schema:
+- Respond ONLY with valid JSON matching this exact schema:
 {
   "dish_name": "string",
   "ingredients": [
@@ -74,17 +77,25 @@ Respond ONLY with a valid JSON object matching this exact schema (keys must matc
 
 async def _generate_with_fallback(contents) -> tuple[str, str]:
     """Returns the response text and the name of the model used."""
+    
+    # Reduce creativity, force logic and rule adherence
+    req_config = types.GenerateContentConfig(
+        temperature=0.1, 
+        response_mime_type="application/json",
+    )
+
     try:
         response = await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: client.models.generate_content(
                 model=PRIMARY_MODEL,
-                contents=contents
+                contents=contents,
+                config=req_config,
             )
         )
         return response.text, PRIMARY_MODEL
     except Exception as e:
-        print(f"\n[WARNING] Primary Model ({PRIMARY_MODEL}) failed: {e}. Switching to Fallback Model...\n")
+        print(f"\n[WARNING] Primary Model ({PRIMARY_MODEL}) failed: {e}. Switching to Fallback...\n")
         
         await asyncio.sleep(2) 
         
@@ -93,13 +104,15 @@ async def _generate_with_fallback(contents) -> tuple[str, str]:
                 None,
                 lambda: client.models.generate_content(
                     model=FALLBACK_MODEL,
-                    contents=contents
+                    contents=contents,
+                    config=req_config 
                 )
             )
             return response.text, FALLBACK_MODEL
         except Exception as backup_error:
             print(f"\n[CRITICAL ERROR] Fallback Model ({FALLBACK_MODEL}) also failed: {backup_error}")
-            raise backup_error 
+            raise backup_error
+        
 
 async def analyze_image(image_bytes: bytes, user_note: str = "", mime_type: str = "image/jpeg") -> dict:
     prompt = SYSTEM_PROMPT
