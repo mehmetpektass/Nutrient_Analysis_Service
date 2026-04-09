@@ -33,6 +33,7 @@ Rules:
 - CORRECT ANY TYPOS from the user note (e.g., "tramisu" -> "tiramisu" -> then decompose).
 - If the user notes a substitution, output the substituted raw ingredient.
 - If a dish is fried, include the cooking oil as a separate ingredient.
+- MANDATORY ADJECTIVES: NEVER use bare nouns for db_query if the state matters. ALWAYS include the preparation or cooking state (e.g., MUST output "roasted almonds" or "raw almonds" instead of just "almonds", "boiled potato" or "fried potato" instead of just "potato").
 - DATABASE AWARENESS: The `db_query` you generate will be directly searched in the USDA FoodData Central database. If an ingredient is highly specific, foreign, cultural, regional, or branded, it likely WILL NOT be found. You MUST translate it into the closest generic US-equivalent for the `db_query` field (e.g., translate a specific cultural cheese to "cream cheese", or "semi-sweet chocolate chips" to "dark chocolate"). Keep the original cultural name in the `name` field for the user to see, but use the generic US term for the `db_query`.
 
 Respond ONLY with valid JSON matching this exact schema:
